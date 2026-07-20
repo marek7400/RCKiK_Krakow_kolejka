@@ -5,17 +5,17 @@ Strona dostępna pod adresem:
 
 https://marek7400.github.io/RCKiK_Krakow_kolejka/
 
-Na stronie RCKiK Kraków widac tylko aktualną liczbę osób w kolejce do lekarza. (tu zazwyczaj traci się najwięcej czasu)
+Na stronie RCKiK Kraków widać tylko aktualną liczbę osób w kolejce do lekarza. (tu zazwyczaj traci się najwięcej czasu)
 
 Nie widząc danych archiwalnych, ani nie znając sposobu jak je wyciągnąć z API, dla zabawy postanowiłem stworzyć własną stronę z wykresami.
 
-Dane zbierane i prezentowane są od 19.07.2026
+Dane zbierane i prezentowane są od 13.07.2026
 
 Pokazywane dane tylko w czasie działania rejestracji:
 
-pon., śr., czw. 07:15 – 16:30; wt., piąt. 07:15 – 14:30
+pon., śr., czw. 07:15 – 16:30; wt., piąt. 07:15 – 14:30
 
-Dostępne sa 4 tryby wizualizacji wykresu, który można zoomować i przesuwać myszką oraz amieniać z słupkowego na liniowy.
+Dostępne są 4 tryby wizualizacji wykresu, który można zoomować i przesuwać myszką oraz zamieniać z słupkowego na liniowy.
 
 Tryb 1 - wybrany dzień np. poniedziałek - pokazuje wszystkie zapisane poniedziałki obok siebie
 
