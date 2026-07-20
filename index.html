@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wizualizacja Kolejki do Lekarza</title>
+    
+    <!-- Biblioteki Chart.js i wtyczki do zooma -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+
+    <style>
+        /* Zmienne kolorystyczne dla trybów */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --panel-bg: #f5f5f5;
+            --border-color: #ccc;
+        }
+        body.dark-mode {
+            --bg-color: #1a1a1a;
+            --text-color: #f5f5f5;
+            --panel-bg: #2a2a2a;
+            --border-color: #555;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        /* Kontener główny (100% wysokości okna) */
+        #chart-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column; 
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* Nowa sekcja nagłówków z loaderem w środku */
+        #chart-headers {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 18px; 
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .header-left, .header-right { flex: 1; }
+        .header-left { color: red; text-align: left; }
+        .header-right { color: var(--text-color); text-align: right; }
+        
+        /* Kontener na środkowy loader */
+        .header-center { 
+            flex: 1; 
+            display: flex; 
+            justify-content: center; 
+        }
+
+        #loading {
+            background: rgba(0,0,0,0.8); 
+            color: white;
+            padding: 8px 20px; 
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: normal;
+            display: none; 
+            text-align: center;
+            line-height: 1.4;
+            z-index: 10;
+        }
+
+        /* Wrapper na canvas */
+        #canvas-wrapper {
+            width: 100%;
+            flex-grow: 1;
+            position: relative;
+        }
+        canvas { max-height: 100%; max-width: 100%; }
+        
+        /* Sekcja ustawień poniżej wykresu */
+        #settings-panel {
+            min-height: 50vh;
+            padding: 40px 20px;
+            background-color: var(--panel-bg);
+            border-top: 2px solid var(--border-color);
+        }
+        
+        /* --- UKŁAD ELASTYCZNY DLA USTAWIEŃ (DOPASOWANY DO TEKSTU) --- */
+        .controls-wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .controls-grid-top {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .controls-grid-bottom {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .control-group { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: flex-start; /* Zapobiega rozciąganiu pól */
+        }
+        label { 
+            font-weight: bold; 
+            margin-bottom: 5px; 
+            font-size: 14px; 
+            white-space: normal; /* Pozwala na zawijanie etykiet na małych ekranach */
+        }
+        select, input:not([type="color"]) {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+            font-size: 16px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            width: fit-content; /* Dopasowuje szerokość pola do tekstu */
+            box-sizing: border-box;
+        }
+        /* Zabezpieczenie minimalnej szerokości dla pola daty */
+        input[type="date"] {
+            min-width: 150px;
+        }
+        button {
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: 0.2s;
+            box-sizing: border-box;
+        }
+        button:hover { background-color: #0056b3; }
+        .reset-btn { 
+            background-color: #dc3545; 
+            margin-top: 40px; 
+            width: 100%; 
+            max-width: 250px; 
+            padding: 12px;
+            font-weight: bold;
+        }
+        .reset-btn:hover { background-color: #c82333; }
+        
+        /* Responsywność dla mniejszych ekranów */
+        @media (max-width: 1100px) {
+            /* Flexbox automatycznie zawija elementy w dół, brak potrzeby sztywnych zmian szerokości */
+        }
+        @media (max-width: 768px) {
+            #chart-headers {
+                flex-direction: column;
+                font-size: 14px;
+                text-align: center;
+                gap: 10px;
+            }
+            .header-left, .header-right { text-align: center; }
+            .controls-grid-top, .controls-grid-bottom {
+                justify-content: center;
+            }
+            .control-group {
+                align-items: center;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="chart-container">
+        <!-- Dodane napisy wg wytycznych z obrazka + loader w środku -->
+        <div id="chart-headers">
+            <div class="header-left">Regionalne Centrum Krwiodawstwa i Krwiolecznictwa w Krakowie</div>
+            <div class="header-center">
+                <div id="loading">Pobieranie danych...<br>
+				(od 13.07.2026) <br>
+				Poczekaj chwilę.
+				</div>
+            </div>
+            <div class="header-right">Ustawienia wykresu: przewiń stronę w dół
+			    <br>
+			    <span style="font-size: 14px; font-weight: normal;">scroll myszki: zoom; można przesuwać myszką wykres
+				<br>
+				info: najedź na punkt na wykresie lub słupek<br>
+				Dane w czasie działania rejestracji:<br>
+				pon., śr., czw. 07:15 – 16:30; wt., piąt. 07:15 – 14:30				
+				</span>
+			</div>
+        </div>
+
+        <div id="canvas-wrapper">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Panel ustawień -->
+    <div id="settings-panel">
+        <div class="controls-wrapper">
+            <!-- Pierwszy rząd -->
+            <div class="controls-grid-top">
+                <div class="control-group">
+                    <label>Tryb wizualizacji</label>
+                    <select id="viewMode">
+                        <option value="1">1. Dni (nakładane na osi czasu)</option>
+                        <option value="2">2. Konkretny dzień i godzina (daty na X)</option>
+                        <option value="3">3. Cały tydzień chronologicznie</option>
+                        <option value="4">4. Uśrednione wyniki dla dnia (godzinowo)</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label>Dzień tygodnia (Tryb 1, 2 i 4)</label>
+                    <select id="dayOfWeek">
+                        <option value="poniedziałek">Poniedziałek</option>
+                        <option value="wtorek">Wtorek</option>
+                        <option value="środa">Środa</option>
+                        <option value="czwartek">Czwartek</option>
+                        <option value="piątek">Piątek</option>
+                        <option value="sobota">Sobota</option>
+                        <option value="niedziela">Niedziela</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Godzina (Tryb 2)</label>
+                    <select id="timeSelect"></select>
+                </div>
+
+                <div class="control-group">
+                    <label>Wybierz dzień w dowolnym tygodniu (Tryb 3)</label>
+                    <input type="date" id="weekDate">
+                </div>
+            </div>
+
+            <!-- Drugi rząd -->
+            <div class="controls-grid-bottom">
+                <div class="control-group">
+                    <label>Typ wykresu</label>
+                    <select id="chartType">
+                        <option value="line">Liniowy</option>
+                        <option value="bar">Słupkowy</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Kolor bazowy (Tryb 1 generuje paletę)</label>
+                    <input type="color" id="chartColor" value="#ff00cc" style="height: 42px; width: 42px; padding: 0; cursor: pointer;">
+                </div>
+
+                <div class="control-group">
+                    <label>Zakres uśredniania (Tryb 4)</label>
+                    <select id="avgRange">
+                        <option value="2w">2 tygodnie</option>
+                        <option value="1m">Miesiąc</option>
+                        <option value="3m">3 miesiące</option>
+                        <option value="6m">6 miesięcy</option>
+                        <option value="1y">Rok</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Motyw tła strony</label>
+                    <select id="themeSelect">
+                        <option value="light">Jasny</option>
+                        <option value="dark">Ciemny</option>
+                    </select>
+                </div>
+            </div>
+            
+            <center><button id="resetBtn" class="reset-btn">Zresetuj Ustawienia</button></center>
+        </div>
+    </div>
+
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycby0MtnzXb21-uZAlClBsW0lmIQ6v5-ZPrpDZ5YsMGTaAppbjRTMAF6kmhLsMARUE6Kv/exec";
+
+    let rawData = [];
+    let myChart = null;
+
+    function getTodayString() {
+        let d = new Date();
+        let yyyy = d.getFullYear();
+        let mm = String(d.getMonth() + 1).padStart(2, '0');
+        let dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    const timeSelect = document.getElementById('timeSelect');
+    for(let h=0; h<24; h++){
+        for(let m=0; m<60; m+=15){
+            let hh = h<10 ? '0'+h : h;
+            let mm = m<10 ? '0'+m : m;
+            timeSelect.innerHTML += `<option value="${hh}:${mm}">${hh}:${mm}</option>`;
+        }
+    }
+
+    const defaultSettings = {
+        viewMode: '1', 
+        dayOfWeek: 'poniedziałek', 
+        timeSelect: '10:00',
+        weekDate: getTodayString(), 
+        chartType: 'line', 
+        chartColor: '#ff00cc', 
+        themeSelect: 'light',
+        avgRange: '3m'
+    };
+
+    function getWeekNumber(d) {
+        let tempDate = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        tempDate.setUTCDate(tempDate.getUTCDate() + 4 - (tempDate.getUTCDay()||7));
+        var yearStart = new Date(Date.UTC(tempDate.getUTCFullYear(),0,1));
+        var weekNo = Math.ceil(( ( (tempDate - yearStart) / 86400000) + 1)/7);
+        return weekNo;
+    }
+
+    // Pomocnicza funkcja do poprawnej polskiej odmiany słowa "osoba" (obsługuje liczby całkowite i ułamkowe)
+    function getOsobPlural(n) {
+        if (n % 1 !== 0) {
+            return 'osoby';
+        }
+        if (n === 1) return 'osoba';
+        const lastDigit = n % 10;
+        const lastTwoDigits = n % 100;
+        if (lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 10 || lastTwoDigits >= 20)) {
+            return 'osoby';
+        }
+        return 'osób';
+    }
+
+    // Ukrywanie lub pokazywanie kontrolek ustawień w zależności od trybu
+    function toggleInputs() {
+        const mode = document.getElementById('viewMode').value;
+        
+        const dayOfWeekGroup = document.getElementById('dayOfWeek').closest('.control-group');
+        const timeSelectGroup = document.getElementById('timeSelect').closest('.control-group');
+        const weekDateGroup = document.getElementById('weekDate').closest('.control-group');
+        const avgRangeGroup = document.getElementById('avgRange').closest('.control-group');
+
+        dayOfWeekGroup.style.display = 'none';
+        timeSelectGroup.style.display = 'none';
+        weekDateGroup.style.display = 'none';
+        avgRangeGroup.style.display = 'none';
+
+        if (mode === '1') {
+            dayOfWeekGroup.style.display = 'flex';
+        } else if (mode === '2') {
+            dayOfWeekGroup.style.display = 'flex';
+            timeSelectGroup.style.display = 'flex';
+        } else if (mode === '3') {
+            weekDateGroup.style.display = 'flex';
+        } else if (mode === '4') {
+            dayOfWeekGroup.style.display = 'flex';
+            avgRangeGroup.style.display = 'flex';
+        }
+    }
+
+    function loadSettings() {
+        Object.keys(defaultSettings).forEach(key => {
+            let saved = localStorage.getItem(key);
+            let val = saved !== null ? saved : defaultSettings[key];
+            if(document.getElementById(key)) document.getElementById(key).value = val;
+        });
+        applyTheme();
+        toggleInputs();
+    }
+
+    function saveSettings() {
+        Object.keys(defaultSettings).forEach(key => {
+            if(document.getElementById(key)) localStorage.setItem(key, document.getElementById(key).value);
+        });
+        applyTheme();
+        toggleInputs();
+        updateChart();
+    }
+
+    function resetSettings() {
+        localStorage.clear();
+        loadSettings();
+        updateChart();
+    }
+
+    function applyTheme() {
+        const theme = document.getElementById('themeSelect').value;
+        if(theme === 'dark') document.body.classList.add('dark-mode');
+        else document.body.classList.remove('dark-mode');
+    }
+
+    function hexToHsl(hex) {
+        hex = hex.replace(/^#/, '');
+        let r = parseInt(hex.substring(0, 2), 16) / 255;
+        let g = parseInt(hex.substring(2, 4), 16) / 255;
+        let b = parseInt(hex.substring(4, 6), 16) / 255;
+
+        let max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h, s, l = (max + min) / 2;
+
+        if (max === min) {
+            h = s = 0;
+        } else {
+            let d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                case g: h = (b - r) / d + 2; break;
+                case b: h = (r - g) / d + 4; break;
+            }
+            h /= 6;
+        }
+        return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+    }
+
+    document.querySelectorAll('select, input').forEach(el => el.addEventListener('change', saveSettings));
+    document.getElementById('resetBtn').addEventListener('click', resetSettings);
+
+    async function fetchData() {
+        const loadingEl = document.getElementById('loading');
+        loadingEl.style.display = 'block';
+        loadingEl.style.background = 'rgba(0,0,0,0.8)';
+        loadingEl.innerHTML = 'Pobieranie danych...<br>(od 13.07.2026)<br> Poczekaj chwilę.';
+        
+        try {
+            const response = await fetch(API_URL);
+            if(!response.ok) throw new Error(`Status serwera: ${response.status} ${response.statusText}`);
+            
+            const data = await response.json();
+            const days = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
+            
+            let parsedData = [];
+            let rows = data.slice(1);
+            
+            for(let i=0; i<rows.length; i++) {
+                let row = rows[i];
+                if(!row || row.length < 3 || !row[0]) continue;
+                
+                let d = new Date(row[0]);
+                if(isNaN(d.getTime())) continue; 
+                
+                const ms15 = 1000 * 60 * 15;
+                let roundedDate = new Date(Math.round(d.getTime() / ms15) * ms15);
+                
+                let hh = roundedDate.getHours().toString().padStart(2, '0');
+                let mm = roundedDate.getMinutes().toString().padStart(2, '0');
+                let timeStr = `${hh}:${mm}`;
+                
+                let yyyy = roundedDate.getFullYear();
+                let mon = (roundedDate.getMonth() + 1).toString().padStart(2, '0');
+                let dd = roundedDate.getDate().toString().padStart(2, '0');
+                let dateStr = `${yyyy}-${mon}-${dd}`;
+                
+                let dayName = days[roundedDate.getDay()];
+                
+                parsedData.push({
+                    dateObj: roundedDate,
+                    queue: parseInt(row[2]) || 0,
+                    timeStr: timeStr,
+                    dayName: dayName,
+                    dateStr: dateStr,
+                    weekNo: getWeekNumber(roundedDate)
+                });
+            }
+            
+            rawData = parsedData;
+            updateChart(); 
+            loadingEl.style.display = 'none'; // Ukryj loader tylko przy sukcesie
+        } catch (error) {
+            console.error("Błąd pobierania danych:", error);
+            loadingEl.style.background = '#dc3545'; // Kolor czerwony wskazujący błąd
+            loadingEl.innerHTML = `Błąd pobierania danych!<br>
+                                   <span style="font-size: 11px; font-weight: bold;">Szczegóły: ${error.message}</span><br>
+                                   <span style="font-size: 11px;">Otwórz konsolę (F12), aby sprawdzić szczegóły sieciowe.</span>`;
+        }
+    }
+
+    function updateChart() {
+        if(!rawData.length) return;
+
+        const mode = document.getElementById('viewMode').value;
+        const selDay = document.getElementById('dayOfWeek').value.toLowerCase();
+        const selTime = document.getElementById('timeSelect').value;
+        const selWeekDate = document.getElementById('weekDate').value;
+        const cType = document.getElementById('chartType').value;
+        const cColor = document.getElementById('chartColor').value;
+        const isDark = document.getElementById('themeSelect').value === 'dark';
+        
+        const gridColor = isDark ? '#444444' : '#dddddd';
+        const fontColor = isDark ? '#eeeeee' : '#333333';
+
+        let datasets = [];
+        let labels = [];
+
+        if (mode === '1') {
+            let filtered = rawData.filter(d => d.dayName === selDay);
+            
+            let groupedByDate = {};
+            filtered.forEach(d => {
+                if(!groupedByDate[d.dateStr]) groupedByDate[d.dateStr] = [];
+                groupedByDate[d.dateStr].push(d);
+            });
+            
+            let allTimes = Array.from(document.getElementById('timeSelect').options).map(o => o.value);
+            let usedTimes = filtered.map(d => d.timeStr);
+            
+            if (usedTimes.length > 0) {
+                let validIndices = usedTimes.map(t => allTimes.indexOf(t)).filter(idx => idx !== -1);
+                if (validIndices.length > 0) {
+                    let minIdx = Math.min(...validIndices);
+                    let maxIdx = Math.max(...validIndices);
+                    labels = allTimes.slice(minIdx, maxIdx + 1);
+                } else {
+                    labels = allTimes;
+                }
+            } else {
+                labels = allTimes; 
+            }
+            
+            let [baseH, baseS, baseL] = hexToHsl(cColor);
+            let cIdx = 0;
+
+            for (const [date, points] of Object.entries(groupedByDate)) {
+                let dataMapped = labels.map(timeLabel => {
+                    let pt = points.find(p => p.timeStr === timeLabel);
+                    return pt ? pt.queue : null; // Przywrócono prostą liczbę lub null
+                });
+
+                // Tworzymy mapę pełnych obiektów punktów jako metadane
+                let rawPointsMapped = labels.map(timeLabel => {
+                    return points.find(p => p.timeStr === timeLabel) || null;
+                });
+                
+                let currentH = baseH;
+                let currentL = baseL;
+                
+                if (baseS < 15) {
+                    currentL = Math.max(15, (baseL + cIdx * 25) % 100);
+                } else {
+                    currentH = (baseH + cIdx * 45) % 360;
+                }
+
+                let colorBorder = `hsl(${currentH}, ${baseS}%, ${currentL}%)`;
+                let colorBg = `hsla(${currentH}, ${baseS}%, ${currentL}%, 0.5)`;
+
+                datasets.push({
+                    label: date,
+                    data: dataMapped,
+                    rawPoints: rawPointsMapped, // Przekazanie metadanych
+                    borderColor: colorBorder,
+                    backgroundColor: colorBg,
+                    borderWidth: 2,
+                    spanGaps: true
+                });
+                cIdx++;
+            }
+
+        } else if (mode === '2') {
+            let filtered = rawData.filter(d => d.dayName === selDay && d.timeStr === selTime);
+            filtered.sort((a,b) => a.dateObj - b.dateObj);
+            
+            labels = filtered.map(d => d.dateStr);
+            datasets.push({
+                label: `Kolejka (${selDay.charAt(0).toUpperCase() + selDay.slice(1)} - ${selTime})`,
+                data: filtered.map(d => d.queue), // Przywrócono prostą liczbę
+                rawPoints: filtered, // Przekazanie metadanych
+                borderColor: cColor,
+                backgroundColor: cColor + '80',
+                borderWidth: 2
+            });
+
+        } else if (mode === '3') {
+            let selectedDateObj = new Date(selWeekDate);
+            let selWeek = getWeekNumber(selectedDateObj); 
+
+            let filtered = rawData.filter(d => d.weekNo === selWeek);
+            filtered.sort((a,b) => a.dateObj - b.dateObj);
+
+            // Wyznaczanie granic dni na osi X
+            let lastDate = null;
+            labels = filtered.map(d => {
+                if (lastDate !== d.dateStr) {
+                    lastDate = d.dateStr;
+                    const capitalizedDay = d.dayName.charAt(0).toUpperCase() + d.dayName.slice(1);
+                    const parts = d.dateStr.split('-');
+                    const shortDate = `${parts[2]}.${parts[1]}`;
+                    return `${capitalizedDay} (${shortDate})`;
+                }
+                return '';
+            });
+
+            datasets.push({
+                label: `Kolejka (${selWeek} tydzień roku)`,
+                data: filtered.map(d => d.queue), // Przywrócono prostą liczbę
+                rawPoints: filtered, // Przekazanie metadanych
+                borderColor: cColor,
+                backgroundColor: cColor + '80',
+                borderWidth: 2
+            });
+
+        } else if (mode === '4') {
+            // Bezpieczny punkt odniesienia do wyliczeń (ostatni zapis w bazie lub dziś)
+            const refDate = rawData.length ? new Date(Math.max(...rawData.map(d => d.dateObj.getTime()))) : new Date();
+            let cutOffDate = new Date(refDate.getTime());
+            
+            const rangeVal = document.getElementById('avgRange').value;
+            if (rangeVal === '2w') {
+                cutOffDate.setDate(cutOffDate.getDate() - 14);
+            } else if (rangeVal === '1m') {
+                cutOffDate.setMonth(cutOffDate.getMonth() - 1);
+            } else if (rangeVal === '3m') {
+                cutOffDate.setMonth(cutOffDate.getMonth() - 3);
+            } else if (rangeVal === '6m') {
+                cutOffDate.setMonth(cutOffDate.getMonth() - 6);
+            } else if (rangeVal === '1y') {
+                cutOffDate.setFullYear(cutOffDate.getFullYear() - 1);
+            }
+
+            // Filtrujemy dane dla wybranego dnia tygodnia w zadanym oknie czasowym
+            let filtered = rawData.filter(d => d.dayName === selDay && d.dateObj >= cutOffDate);
+            
+            // Grupowanie wartości pomiarów dla poszczególnych godzin
+            let timeGroups = {};
+            filtered.forEach(d => {
+                if (!timeGroups[d.timeStr]) timeGroups[d.timeStr] = [];
+                timeGroups[d.timeStr].push(d.queue);
+            });
+
+            let allTimes = Array.from(document.getElementById('timeSelect').options).map(o => o.value);
+            let usedTimes = Object.keys(timeGroups);
+            
+            if (usedTimes.length > 0) {
+                let validIndices = usedTimes.map(t => allTimes.indexOf(t)).filter(idx => idx !== -1);
+                if (validIndices.length > 0) {
+                    let minIdx = Math.min(...validIndices);
+                    let maxIdx = Math.max(...validIndices);
+                    labels = allTimes.slice(minIdx, maxIdx + 1);
+                } else {
+                    labels = allTimes;
+                }
+            } else {
+                labels = allTimes;
+            }
+
+            let avgData = [];
+            let rawPointsMapped = [];
+
+            const rangeLabels = {
+                '2w': '2 tyg.',
+                '1m': '1 mies.',
+                '3m': '3 mies.',
+                '6m': '6 mies.',
+                '1y': 'roku'
+            };
+
+            labels.forEach(timeLabel => {
+                let queues = timeGroups[timeLabel];
+                if (queues && queues.length > 0) {
+                    let sum = queues.reduce((a, b) => a + b, 0);
+                    let avg = Math.round((sum / queues.length) * 10) / 10; // Zaokrąglenie do 1 miejsca po przecinku
+                    avgData.push(avg);
+                    
+                    rawPointsMapped.push({
+                        timeStr: timeLabel,
+                        dayName: selDay,
+                        dateStr: `Średnia z ${rangeLabels[rangeVal]}`,
+                        isAverage: true,
+                        count: queues.length
+                    });
+                } else {
+                    avgData.push(null);
+                    rawPointsMapped.push(null);
+                }
+            });
+
+            datasets.push({
+                label: `Uśredniona kolejka — ${selDay.charAt(0).toUpperCase() + selDay.slice(1)}`,
+                data: avgData,
+                rawPoints: rawPointsMapped,
+                borderColor: cColor,
+                backgroundColor: cColor + '30',
+                borderWidth: 2,
+                spanGaps: true
+            });
+        }
+
+        if (myChart) myChart.destroy(); 
+        
+        const ctx = document.getElementById('myChart').getContext('2d');
+        myChart = new Chart(ctx, {
+            type: cType, 
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                color: fontColor,
+                plugins: {
+                    legend: { labels: { color: fontColor } },
+                    zoom: {
+                        zoom: {
+                            wheel: { enabled: true },
+                            pinch: { enabled: true },
+                            mode: 'x', 
+                        },
+                        pan: {
+                            enabled: true,
+                            mode: 'x', 
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            // Tytuł tooltipu odczytujący godzinę, dzień tygodnia oraz sformatowaną datę / status uśrednienia
+                            title: function(tooltipItems) {
+                                const item = tooltipItems[0];
+                                const dataset = item.dataset;
+                                if (dataset && dataset.rawPoints) {
+                                    const d = dataset.rawPoints[item.dataIndex];
+                                    if (d) {
+                                        const capitalizedDay = d.dayName.charAt(0).toUpperCase() + d.dayName.slice(1);
+                                        if (d.isAverage) {
+                                            return `${d.timeStr}, ${capitalizedDay} (${d.dateStr}, ${d.count} pom.)`;
+                                        }
+                                        const parts = d.dateStr.split('-');
+                                        const formattedDate = `${parts[2]}.${parts[1]}.${parts[0]}`; // DD.MM.YYYY
+                                        return `${d.timeStr}, ${capitalizedDay}, ${formattedDate}`;
+                                    }
+                                }
+                                return item.label;
+                            },
+                            // Wartość podpowiedzi (Kolejka: xx osób) z polską odmianą gramatyczną
+                            label: function(context) {
+                                const val = context.parsed.y;
+                                if (val !== null && val !== undefined) {
+                                    return `Kolejka: ${val} ${getOsobPlural(val)}`;
+                                }
+                                return '';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { 
+                            color: fontColor,
+                            autoSkip: mode !== '3', // Zablokowanie automatycznego ukrywania ważnych etykiet w Trybie 3
+                            maxRotation: 0,
+                            minRotation: 0
+                        },
+                        grid: {
+                            color: function(context) {
+                                if (mode === '3') {
+                                    // Sprawdzenie, czy ten indeks rozpoczyna nowy dzień (etykieta nie jest pusta)
+                                    if (labels[context.index] && labels[context.index] !== '') {
+                                        return isDark ? '#666666' : '#999999'; // Wyraźna linia graniczna dnia
+                                    }
+                                    return 'transparent'; // Ukrycie pozostałych pionowych linii
+                                }
+                                return gridColor;
+                            },
+                            lineWidth: function(context) {
+                                if (mode === '3') {
+                                    if (labels[context.index] && labels[context.index] !== '') {
+                                        return 2; // Grubsza linia pionowa dla granicy dnia
+                                    }
+                                    return 0; // Grubość 0 dla pozostałych linii
+                                }
+                                return 1;
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'kolejka do lekarza', 
+                            color: fontColor,
+                            font: { size: 16 }
+                        },
+                        ticks: { 
+                            color: fontColor,
+                            precision: 0 
+                        },
+                        grid: { color: gridColor }
+                    }
+                }
+            }
+        });
+    }
+
+    window.onload = () => {
+        loadSettings();
+        fetchData();
+    };
+
+</script>
+</body>
+</html>
