@@ -1,6 +1,10 @@
 # RCKiK_Krakow_kolejka
 Regionalne Centrum Krwiodawstwa i Krwiolecznictwa w Krakowie-wykresy kolejki do lekarza.
 
+Strona dostępna pod adresem:
+
+https://marek7400.github.io/RCKiK_Krakow_kolejka/
+
 Na stronie RCKiK Kraków widac tylko aktualną liczbę osób w kolejce do lekarza. (tu zazwyczaj traci się najwięcej czasu)
 
 Nie widząc danych archiwalnych, ani nie znając sposobu jak je wyciągnąć z API, dla zabawy postanowiłem stworzyć własną stronę z wykresami.
