@@ -1,4 +1,6 @@
 # RCKiK_Krakow_kolejka
+hmmm...10.09 przestało coś działać...
+
 Regionalne Centrum Krwiodawstwa i Krwiolecznictwa w Krakowie-wykresy kolejki do lekarza.
 
 Strona dostępna pod adresem:
