@@ -2,7 +2,7 @@
 hmmm...10.09 przestało coś działać...
 Już wiem, gdzie problem: zawiesiło mi darmowe konto, na którym uruchamiałem skrypt.
 muszę przerobić skrypt żeby uruchamiał się od innego dostawcy...
-Niestety RCKiK blokuje całe pule adresów IP, które pobierają "masowo" dane.
+DOdatkowo, niestety, RCKiK blokuje całe pule adresów IP, które pobierają "masowo" dane.
 
 
 
