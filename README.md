@@ -5,8 +5,8 @@ muszę przerobić skrypt żeby uruchamiał się od innego dostawcy...
 Dodatkowo, niestety, RCKiK zaczął blokować całe pule adresów IP, które pobierają "masowo" dane.
 
 ****************************************************************************************************
-NIESTETY, RCKiK zablokowało WSZYSTKIE darmowe serwery do pobierania danych.
-Skryptu za free NIE DA SIĘ uruchomić i pobrać danych.
+# NIESTETY, RCKiK zablokowało WSZYSTKIE darmowe serwery do pobierania danych.
+# Skryptu za free NIE DA SIĘ uruchomić i pobrać danych.
 ****************************************************************************************************
 
 Regionalne Centrum Krwiodawstwa i Krwiolecznictwa w Krakowie-wykresy kolejki do lekarza.
