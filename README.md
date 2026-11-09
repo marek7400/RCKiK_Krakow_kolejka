@@ -1,7 +1,7 @@
 # RCKiK_Krakow_kolejka
 
 
-Po kilku dniach coś się odblokowało i znów pobiera dane.
+Po kilku dniach coś się odblokowało i znów pobiera dane. I znów wysiadło — nie wiem dlaczego…
 
 ****************************************************************************************************
 hmmm...10.09 przestało coś działać...
