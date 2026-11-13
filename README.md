@@ -1,5 +1,6 @@
 # RCKiK_Krakow_kolejka
 
+13.11.2026 Znalazłem przyczynę, poprawiłem kod - może teraz zadziała... 
 
 Po kilku dniach coś się odblokowało i znów pobiera dane. I znów wysiadło — nie wiem dlaczego…
 
