@@ -1,6 +1,6 @@
 # RCKiK_Krakow_kolejka
 
-13.11.2026 Znalazłem przyczynę, poprawiłem kod - może teraz zadziała... 
+13.11.2026 Znalazłem przyczynę, poprawiłem kod - może teraz zadziała...a jak nie to znaczy, że blokada jest na IP i nie da się ściągać danych prze api -  inaczej jak z lokalnego PC.  
 
 Po kilku dniach coś się odblokowało i znów pobiera dane. I znów wysiadło — nie wiem dlaczego…
 
